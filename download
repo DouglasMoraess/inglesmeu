@@ -1,0 +1,47 @@
+/**
+ * Tradução automática usando a API pública e gratuita do MyMemory
+ * (https://mymemory.translated.net). Não exige chave de API, mas tem um
+ * limite generoso de uso diário por IP. Se a tradução falhar por qualquer
+ * motivo (limite atingido, sem internet, etc.), a função devolve uma string
+ * vazia e o usuário pode preencher manualmente na tela de revisão.
+ */
+export async function translateEnToPt(text: string): Promise<string> {
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
+      text
+    )}&langpair=en|pt-BR`;
+    const res = await fetch(url);
+    if (!res.ok) return "";
+    const data = await res.json();
+    const translated = data?.responseData?.translatedText as string | undefined;
+    if (!translated) return "";
+    // MyMemory sometimes echoes an error message as if it were a translation.
+    if (/MYMEMORY WARNING|INVALID|QUOTA/i.test(translated)) return "";
+    return translated;
+  } catch {
+    return "";
+  }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Traduz uma lista de frases em sequência (não em paralelo), com uma
+ * pequena pausa entre cada chamada para não sobrecarregar a API gratuita.
+ * Chama onProgress a cada item concluído para atualizar a barra de progresso.
+ */
+export async function translateBatch(
+  texts: string[],
+  onProgress?: (done: number, total: number) => void
+): Promise<string[]> {
+  const results: string[] = [];
+  for (let i = 0; i < texts.length; i++) {
+    const translated = await translateEnToPt(texts[i]);
+    results.push(translated);
+    onProgress?.(i + 1, texts.length);
+    if (i < texts.length - 1) await delay(350);
+  }
+  return results;
+}
